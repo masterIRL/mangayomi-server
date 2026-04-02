@@ -1,10 +1,10 @@
 use crate::sync::manga::model::{MangaList, Model};
+use crate::db::bulk_upsert::get_global_upserter;
 use actix_web::web;
 use futures::TryStreamExt;
 use mongodb::bson::oid::ObjectId;
-use mongodb::bson::{doc, to_document};
-use mongodb::options::{UpdateOneModel, WriteModel};
-use mongodb::{Client, Collection, Namespace};
+use mongodb::bson::doc;
+use mongodb::{Client, Collection};
 use serde::de::DeserializeOwned;
 
 pub async fn sync_manga_list(
@@ -12,10 +12,11 @@ pub async fn sync_manga_list(
     manga_list: &MangaList,
     db: web::Data<Client>,
 ) -> MangaList {
-    let col_categories = db.database("mangayomi").collection("categories");
-    let col_manga = db.database("mangayomi").collection("manga");
-    let col_chapter = db.database("mangayomi").collection("chapters");
-    let col_track = db.database("mangayomi").collection("tracks");
+    let database = db.database("mangayomi");
+    let col_categories: Collection<crate::sync::manga::model::Category> = database.collection("categories");
+    let col_manga: Collection<crate::sync::manga::model::Manga> = database.collection("manga");
+    let col_chapter: Collection<crate::sync::manga::model::Chapter> = database.collection("chapters");
+    let col_track: Collection<crate::sync::manga::model::Track> = database.collection("tracks");
     let reset_all = manga_list.reset_all.unwrap_or(false);
 
     if reset_all {
@@ -25,16 +26,26 @@ pub async fn sync_manga_list(
         delete_many(&col_track, user_id, &[0], true).await;
     }
 
-    upsert(
-        &db,
-        col_categories.namespace(),
-        user_id,
-        &manga_list.categories,
-    )
-    .await;
-    upsert(&db, col_manga.namespace(), user_id, &manga_list.manga).await;
-    upsert(&db, col_chapter.namespace(), user_id, &manga_list.chapters).await;
-    upsert(&db, col_track.namespace(), user_id, &manga_list.tracks).await;
+    // Use bulk upserter (auto-detects MongoDB version)
+    if let Some(upserter) = get_global_upserter() {
+        upserter.upsert_batch(&col_categories, &manga_list.categories, user_id, |item: &crate::sync::manga::model::Category| {
+            (item.get_id(), item.get_updated_at())
+        }).await.ok();
+        
+        upserter.upsert_batch(&col_manga, &manga_list.manga, user_id, |item: &crate::sync::manga::model::Manga| {
+            (item.get_id(), item.get_updated_at())
+        }).await.ok();
+        
+        upserter.upsert_batch(&col_chapter, &manga_list.chapters, user_id, |item: &crate::sync::manga::model::Chapter| {
+            (item.get_id(), item.get_updated_at())
+        }).await.ok();
+        
+        upserter.upsert_batch(&col_track, &manga_list.tracks, user_id, |item: &crate::sync::manga::model::Track| {
+            (item.get_id(), item.get_updated_at())
+        }).await.ok();
+    } else {
+        log::error!("BulkUpserter not initialized!");
+    }
 
     if !reset_all {
         delete_many(
@@ -88,45 +99,6 @@ async fn delete_many<T: Send + Sync>(
     match del_result {
         Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
         Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
-    }
-}
-
-async fn upsert<T: Send + Sync + serde::Serialize + Model>(
-    db: &web::Data<Client>,
-    namespace: Namespace,
-    user_id: ObjectId,
-    items: &Vec<T>,
-) {
-    let mut ops = vec![];
-    for item in items {
-        let mut doc = match to_document(&item) {
-            Ok(doc) => doc,
-            Err(err) => {
-                log::error!("Failed to serialize item to BSON document: {}", err);
-                continue;
-            }
-        };
-        doc.insert("user", user_id);
-        ops.push(WriteModel::UpdateOne(
-            UpdateOneModel::builder()
-                .namespace(namespace.to_owned())
-                .filter(doc! {
-                    "id": item.get_id(),
-                    "user": user_id,
-                    "updatedAt": { "$lt": item.get_updated_at() },
-                })
-                .update(doc! {
-                    "$set": doc
-                })
-                .upsert(true)
-                .build(),
-        ));
-    }
-    if !ops.is_empty() {
-        match db.bulk_write(ops).ordered(false).await {
-            Ok(result) => log::info!("Upserted {} {}.", result.modified_count, namespace.coll),
-            Err(err) => log::error!("Failed to upsert {}: {}", namespace.coll, err),
-        }
     }
 }
 

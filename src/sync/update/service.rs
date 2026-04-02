@@ -1,10 +1,10 @@
 use crate::sync::update::model::{Update, UpdateList};
+use crate::db::bulk_upsert::{get_global_upserter};
 use actix_web::web;
 use futures::TryStreamExt;
 use mongodb::bson::oid::ObjectId;
-use mongodb::bson::{doc, to_document};
-use mongodb::options::{UpdateOneModel, WriteModel};
-use mongodb::{Client, Collection, Namespace};
+use mongodb::bson::doc;
+use mongodb::{Client, Collection};
 use serde::de::DeserializeOwned;
 
 pub async fn sync_update_list(
@@ -12,20 +12,32 @@ pub async fn sync_update_list(
     update_list: &UpdateList,
     db: web::Data<Client>,
 ) -> UpdateList {
-    let col_updates = db.database("mangayomi").collection("updates");
+    let database = db.database("mangayomi");
+    let col_updates: Collection<Update> = database.collection("updates");
     let reset_all = update_list.reset_all.unwrap_or(false);
 
     if reset_all {
         delete_many(&col_updates, user_id, &[0], true).await;
     }
 
-    upsert(
-        &db,
-        col_updates.namespace(),
-        user_id,
-        &update_list.updates,
-    )
-    .await;
+    // Use bulk upserter (auto-detects MongoDB version)
+    if let Some(upserter) = get_global_upserter() {
+        match upserter.upsert_batch(
+            &col_updates,
+            &update_list.updates,
+            user_id,
+            |u: &Update| (u.id, u.updated_at)
+        ).await {
+            Ok(result) => {
+                if !result.failed_items.is_empty() {
+                    log::error!("Update upsert had {} failures", result.failed_items.len());
+                }
+            }
+            Err(e) => log::error!("Failed to upsert updates: {}", e),
+        }
+    } else {
+        log::error!("BulkUpserter not initialized!");
+    }
 
     if !reset_all {
         delete_many(
@@ -70,45 +82,6 @@ async fn delete_many<T: Send + Sync>(
     match del_result {
         Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
         Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
-    }
-}
-
-async fn upsert(
-    db: &web::Data<Client>,
-    namespace: Namespace,
-    user_id: ObjectId,
-    updates: &Vec<Update>,
-) {
-    let mut ops = vec![];
-    for update in updates {
-        let mut doc = match to_document(&update) {
-            Ok(doc) => doc,
-            Err(err) => {
-                log::error!("Failed to serialize update to BSON document: {}", err);
-                continue;
-            }
-        };
-        doc.insert("user", user_id);
-        ops.push(WriteModel::UpdateOne(
-            UpdateOneModel::builder()
-                .namespace(namespace.to_owned())
-                .filter(doc! {
-                    "id": update.id,
-                    "user": user_id,
-                    "updatedAt": { "$lt": update.updated_at },
-                })
-                .update(doc! {
-                    "$set": doc
-                })
-                .upsert(true)
-                .build(),
-        ));
-    }
-    if !ops.is_empty() {
-        match db.bulk_write(ops).ordered(false).await {
-            Ok(result) => log::info!("Upserted {} updates.", result.modified_count),
-            Err(err) => log::error!("Failed to upsert updates: {}", err),
-        }
     }
 }
 

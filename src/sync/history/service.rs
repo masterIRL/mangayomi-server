@@ -1,10 +1,10 @@
 use crate::sync::history::model::{History, HistoryList};
+use crate::db::bulk_upsert::{get_global_upserter};
 use actix_web::web;
 use futures::TryStreamExt;
 use mongodb::bson::oid::ObjectId;
-use mongodb::bson::{doc, to_document};
-use mongodb::options::{UpdateOneModel, WriteModel};
-use mongodb::{Client, Collection, Namespace};
+use mongodb::bson::doc;
+use mongodb::{Client, Collection};
 use serde::de::DeserializeOwned;
 
 pub async fn sync_history_list(
@@ -12,20 +12,32 @@ pub async fn sync_history_list(
     history_list: &HistoryList,
     db: web::Data<Client>,
 ) -> HistoryList {
-    let col_histories = db.database("mangayomi").collection("histories");
+    let database = db.database("mangayomi");
+    let col_histories: Collection<History> = database.collection("histories");
     let reset_all = history_list.reset_all.unwrap_or(false);
 
     if reset_all {
         delete_many(&col_histories, user_id, &[0], true).await;
     }
 
-    upsert(
-        &db,
-        col_histories.namespace(),
-        user_id,
-        &history_list.histories,
-    )
-    .await;
+    // Use bulk upserter (auto-detects MongoDB version)
+    if let Some(upserter) = get_global_upserter() {
+        match upserter.upsert_batch(
+            &col_histories,
+            &history_list.histories,
+            user_id,
+            |h: &History| (h.id, h.updated_at)
+        ).await {
+            Ok(result) => {
+                if !result.failed_items.is_empty() {
+                    log::error!("History upsert had {} failures", result.failed_items.len());
+                }
+            }
+            Err(e) => log::error!("Failed to upsert histories: {}", e),
+        }
+    } else {
+        log::error!("BulkUpserter not initialized!");
+    }
 
     if !reset_all {
         delete_many(
@@ -70,45 +82,6 @@ async fn delete_many<T: Send + Sync>(
     match del_result {
         Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
         Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
-    }
-}
-
-async fn upsert(
-    db: &web::Data<Client>,
-    namespace: Namespace,
-    user_id: ObjectId,
-    histories: &Vec<History>,
-) {
-    let mut ops = vec![];
-    for history in histories {
-        let mut doc = match to_document(&history) {
-            Ok(doc) => doc,
-            Err(err) => {
-                log::error!("Failed to serialize history to BSON document: {}", err);
-                continue;
-            }
-        };
-        doc.insert("user", user_id);
-        ops.push(WriteModel::UpdateOne(
-            UpdateOneModel::builder()
-                .namespace(namespace.to_owned())
-                .filter(doc! {
-                    "id": history.id,
-                    "user": user_id,
-                    "updatedAt": { "$lt": history.updated_at },
-                })
-                .update(doc! {
-                    "$set": doc
-                })
-                .upsert(true)
-                .build(),
-        ));
-    }
-    if !ops.is_empty() {
-        match db.bulk_write(ops).ordered(false).await {
-            Ok(result) => log::info!("Upserted {} histories.", result.modified_count),
-            Err(err) => log::error!("Failed to upsert histories: {}", err),
-        }
     }
 }
 

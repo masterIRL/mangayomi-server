@@ -70,6 +70,9 @@ async fn main() -> std::io::Result<()> {
 
     init_db_indexes(conn).await;
 
+    // Initialize bulk upserter with MongoDB version detection
+    db::bulk_upsert::initialize_global_upserter(conn).await;
+
     /*
     if *globals::USE_REDIS {
                 let redis_store = RedisSessionStore::new(redis_url)
