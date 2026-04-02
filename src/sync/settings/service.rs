@@ -32,7 +32,13 @@ async fn upsert(
     user_id: ObjectId,
     settings: &Settings,
 ) {
-    let mut doc = to_document(&settings).unwrap();
+    let mut doc = match to_document(&settings) {
+        Ok(doc) => doc,
+        Err(err) => {
+            log::error!("Failed to serialize settings to BSON document: {}", err);
+            return;
+        }
+    };
     doc.insert("user", user_id);
     match db
         .bulk_write(vec![WriteModel::UpdateOne(
@@ -52,8 +58,8 @@ async fn upsert(
         .ordered(false)
         .await
     {
-        Ok(result) => log::info!("Upserted {} updates.", result.modified_count),
-        Err(_) => {}
+        Ok(result) => log::info!("Upserted {} settings.", result.modified_count),
+        Err(err) => log::error!("Failed to upsert settings: {}", err),
     }
 }
 
@@ -62,9 +68,9 @@ async fn find_one<T: DeserializeOwned + Unpin + Send + Sync>(
     user_id: ObjectId,
 ) -> Option<T> {
     match collection.find_one(doc! { "user": user_id }).await {
-        Ok(result) => Some(result.unwrap()),
+        Ok(result) => result,
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Failed to find document: {}", err);
             None
         }
     }

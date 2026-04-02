@@ -5,6 +5,7 @@ use crate::sync::update::model::Update;
 use crate::user::model::{BasicUser, UpdateUser, User};
 use actix_web::web;
 use argon2::Argon2;
+use std::convert::TryFrom;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, to_document};
 use mongodb::{Client, Collection};
@@ -13,13 +14,10 @@ use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn get_timestamp() -> i64 {
-    i64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis(),
-    )
-    .unwrap()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| i64::try_from(d.as_millis()).unwrap_or(0))
+        .unwrap_or(0)
 }
 
 /// inserts a new account if it does not exist yet
@@ -30,9 +28,13 @@ pub async fn register_account(db: web::Data<Client>, user: &web::Json<BasicUser>
     let usr = find_account(&user.email, &db).await;
     if usr.is_none() {
         let salt = SaltString::generate(&mut OsRng);
-        let password_hash = Argon2::default()
-            .hash_password(user.password.as_bytes(), &salt)
-            .expect("Failed to hash password!");
+        let password_hash = match Argon2::default().hash_password(user.password.as_bytes(), &salt) {
+            Ok(hash) => hash,
+            Err(err) => {
+                log::error!("Failed to hash password: {}", err);
+                return None;
+            }
+        };
         let collection = db.database("mangayomi").collection("users");
         let timestamp = get_timestamp();
         let account = User {
@@ -47,7 +49,7 @@ pub async fn register_account(db: web::Data<Client>, user: &web::Json<BasicUser>
         return match collection.insert_one(account).await {
             Ok(_result) => find_account(&user.email, &db).await,
             Err(err) => {
-                log::error!("{}", err);
+                log::error!("Failed to insert user: {}", err);
                 None
             }
         };
@@ -57,17 +59,20 @@ pub async fn register_account(db: web::Data<Client>, user: &web::Json<BasicUser>
 
 // returns account if the email and password matches
 pub async fn login_account(db: web::Data<Client>, user: &web::Json<BasicUser>) -> Option<User> {
-    let result = find_account(&user.email, &db).await;
-    if result.is_some() {
-        let account = result.unwrap();
-        let hash = PasswordHash::new(&account.password).expect("Failed to hash password!");
+    if let Some(account) = find_account(&user.email, &db).await {
+        let hash = match PasswordHash::new(&account.password) {
+            Ok(h) => h,
+            Err(err) => {
+                log::error!("Failed to parse password hash: {}", err);
+                return None;
+            }
+        };
         if Argon2::default()
             .verify_password(user.password.as_bytes(), &hash)
             .is_ok()
         {
             return Some(account);
         }
-        return None;
     }
     None
 }
@@ -79,13 +84,19 @@ pub async fn update_account(
     data: &web::Json<UpdateUser>,
 ) -> bool {
     let exist_user = find_account(&data.email, &db).await;
-    if exist_user.is_some() && exist_user.unwrap().id.unwrap() != user_id {
-        return false;
+    if let Some(usr) = exist_user {
+        if usr.id != Some(user_id) {
+            return false;
+        }
     }
-    let result = find_account_by_id(user_id, &db).await;
-    if result.is_some() {
-        let mut account = result.unwrap();
-        let hash = PasswordHash::new(&account.password).expect("Failed to hash password!");
+    if let Some(mut account) = find_account_by_id(user_id, &db).await {
+        let hash = match PasswordHash::new(&account.password) {
+            Ok(h) => h,
+            Err(err) => {
+                log::error!("Failed to parse password hash: {}", err);
+                return false;
+            }
+        };
         let allow_pw = Argon2::default()
             .verify_password(data.password_old.as_bytes(), &hash)
             .is_ok();
@@ -94,39 +105,42 @@ pub async fn update_account(
         }
         if allow_pw {
             let salt = SaltString::generate(&mut OsRng);
-            let password_hash = Argon2::default()
-                .hash_password(data.password.as_bytes(), &salt)
-                .expect("Failed to hash password!");
+            let password_hash = match Argon2::default()
+                .hash_password(data.password.as_bytes(), &salt) {
+                    Ok(h) => h,
+                    Err(err) => {
+                        log::error!("Failed to hash new password: {}", err);
+                        return false;
+                    }
+                };
             account.salt = salt.to_string();
             account.password = password_hash.to_string();
         }
         account.email = data.email.to_owned();
         let timestamp = get_timestamp();
         account.updated_at = timestamp;
-        let doc = to_document(&account).unwrap();
+        let doc = match to_document(&account) {
+            Ok(d) => d,
+            Err(err) => {
+                log::error!("Failed to convert account to bson document: {}", err);
+                return false;
+            }
+        };
         let col_users: mongodb::Collection<User> = db.database("mangayomi").collection("users");
         let result = col_users
             .update_one(
-                doc! {
-                    "_id": user_id
-                },
-                doc! {
-                    "$set": doc
-                },
+                doc! { "_id": user_id },
+                doc! { "$set": doc },
             )
             .await;
-        return match result {
-            Ok(_) => true,
-            Err(_) => false,
-        };
+        return result.is_ok();
     }
     false
 }
 
 // delete account and related collections
 pub async fn delete_account(db: web::Data<Client>, user_id: ObjectId) -> bool {
-    let result = find_account_by_id(user_id, &db).await;
-    if result.is_some() {
+    if find_account_by_id(user_id, &db).await.is_some() {
         let col_users: mongodb::Collection<User> = db.database("mangayomi").collection("users");
         let col_categories: mongodb::Collection<Category> =
             db.database("mangayomi").collection("categories");
@@ -140,14 +154,19 @@ pub async fn delete_account(db: web::Data<Client>, user_id: ObjectId) -> bool {
             db.database("mangayomi").collection("updates");
         let col_settings: mongodb::Collection<Settings> =
             db.database("mangayomi").collection("settings");
-        delete_many(&col_categories, user_id, &vec![0], false).await;
-        delete_many(&col_manga, user_id, &vec![0], false).await;
-        delete_many(&col_chapter, user_id, &vec![0], false).await;
-        delete_many(&col_track, user_id, &vec![0], false).await;
-        delete_many(&col_histories, user_id, &vec![0], false).await;
-        delete_many(&col_updates, user_id, &vec![0], false).await;
-        delete_many(&col_settings, user_id, &vec![0], false).await;
-        delete_many(&col_users, user_id, &vec![0], true).await;
+        
+        let empty_ids: &[i64] = &[0];
+        delete_many(&col_categories, user_id, empty_ids, false).await;
+        delete_many(&col_manga, user_id, empty_ids, false).await;
+        delete_many(&col_chapter, user_id, empty_ids, false).await;
+        delete_many(&col_track, user_id, empty_ids, false).await;
+        delete_many(&col_histories, user_id, empty_ids, false).await;
+        delete_many(&col_updates, user_id, empty_ids, false).await;
+        delete_many(&col_settings, user_id, empty_ids, false).await;
+        
+        let user_empty: &[i32] = &[0];
+        // For User table we still pass &[i32] to delete_many_user
+        delete_many_user(&col_users, user_id, user_empty, true).await;
         return true;
     }
     false
@@ -156,37 +175,54 @@ pub async fn delete_account(db: web::Data<Client>, user_id: ObjectId) -> bool {
 async fn delete_many<T: Send + Sync>(
     collection: &Collection<T>,
     user_id: ObjectId,
-    ids: &Vec<i32>,
+    ids: &[i64],
     is_user: bool,
 ) {
     if ids.is_empty() {
         return;
     }
-    let del_tracks_result = collection
+    let del_result = collection
         .delete_many(if is_user {
-            doc! {
-                "_id": user_id,
-            }
+            doc! { "_id": user_id }
         } else {
-            doc! {
-                "user": user_id,
-            }
+            doc! { "user": user_id }
         })
         .await;
-    match del_tracks_result {
+    match del_result {
         Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
-        Err(_) => log::error!("Failed to delete {}.", collection.name()),
+        Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
     }
 }
 
-/// returns an account with the matching email
+async fn delete_many_user<T: Send + Sync>(
+    collection: &Collection<T>,
+    user_id: ObjectId,
+    ids: &[i32],
+    is_user: bool,
+) {
+    if ids.is_empty() {
+        return;
+    }
+    let del_result = collection
+        .delete_many(if is_user {
+            doc! { "_id": user_id }
+        } else {
+            doc! { "user": user_id }
+        })
+        .await;
+    match del_result {
+        Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
+        Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
+    }
+}
+
+/// returns an account with the matching id
 async fn find_account_by_id(id: ObjectId, db: &Client) -> Option<User> {
     let collection = db.database("mangayomi").collection("users");
     match collection.find_one(doc! { "_id": id }).await {
-        Ok(Some(user)) => Some(user),
-        Ok(None) => None,
+        Ok(user) => user,
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Failed to find account by id: {}", err);
             None
         }
     }
@@ -196,10 +232,9 @@ async fn find_account_by_id(id: ObjectId, db: &Client) -> Option<User> {
 async fn find_account(email: &String, db: &Client) -> Option<User> {
     let collection = db.database("mangayomi").collection("users");
     match collection.find_one(doc! { "email": email }).await {
-        Ok(Some(user)) => Some(user),
-        Ok(None) => None,
+        Ok(user) => user,
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Failed to find account by email: {}", err);
             None
         }
     }

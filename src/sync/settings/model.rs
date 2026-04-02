@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct Settings {
     #[serde(rename = "_id", skip_serializing)]
     pub oid: Option<ObjectId>,
-    pub id: i32,
+    pub id: i64,
     #[serde(skip_serializing)]
     pub user: Option<ObjectId>,
     #[serde(rename = "updatedAt")]

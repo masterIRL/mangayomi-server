@@ -11,7 +11,10 @@ async fn sync_histories(
     user: Identity,
     history_list: web::Json<HistoryList>,
 ) -> impl Responder {
-    let user_id = ObjectId::parse_str(&user.id().unwrap()).unwrap();
+    let user_id = match user.id().ok().and_then(|id| ObjectId::parse_str(&id).ok()) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().finish(),
+    };
     let result = sync_history_list(user_id, &history_list, client);
     HttpResponse::Ok().json(result.await)
 }

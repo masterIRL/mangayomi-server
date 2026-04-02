@@ -13,20 +13,28 @@ pub async fn sync_update_list(
     db: web::Data<Client>,
 ) -> UpdateList {
     let col_updates = db.database("mangayomi").collection("updates");
-    let reset_all = update_list
-        .reset_all
-        .clone()
-        .get_or_insert(false)
-        .to_owned();
+    let reset_all = update_list.reset_all.unwrap_or(false);
 
     if reset_all {
-        delete_many(&col_updates, user_id, &vec![0], true).await;
+        delete_many(&col_updates, user_id, &[0], true).await;
     }
 
-    upsert(&db, col_updates.namespace(), user_id, &update_list.updates).await;
+    upsert(
+        &db,
+        col_updates.namespace(),
+        user_id,
+        &update_list.updates,
+    )
+    .await;
 
     if !reset_all {
-        delete_many(&col_updates, user_id, &update_list.deleted_updates, false).await;
+        delete_many(
+            &col_updates,
+            user_id,
+            &update_list.deleted_updates,
+            false,
+        )
+        .await;
     }
 
     UpdateList {
@@ -39,13 +47,13 @@ pub async fn sync_update_list(
 async fn delete_many<T: Send + Sync>(
     collection: &Collection<T>,
     user_id: ObjectId,
-    ids: &Vec<i32>,
+    ids: &[i64],
     reset_all: bool,
 ) {
     if ids.is_empty() {
         return;
     }
-    let del_tracks_result = collection
+    let del_result = collection
         .delete_many(if reset_all {
             doc! {
                 "user": user_id,
@@ -59,9 +67,9 @@ async fn delete_many<T: Send + Sync>(
             }
         })
         .await;
-    match del_tracks_result {
+    match del_result {
         Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
-        Err(_) => log::error!("Failed to delete {}.", collection.name()),
+        Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
     }
 }
 
@@ -73,7 +81,13 @@ async fn upsert(
 ) {
     let mut ops = vec![];
     for update in updates {
-        let mut doc = to_document(&update).unwrap();
+        let mut doc = match to_document(&update) {
+            Ok(doc) => doc,
+            Err(err) => {
+                log::error!("Failed to serialize update to BSON document: {}", err);
+                continue;
+            }
+        };
         doc.insert("user", user_id);
         ops.push(WriteModel::UpdateOne(
             UpdateOneModel::builder()
@@ -93,7 +107,7 @@ async fn upsert(
     if !ops.is_empty() {
         match db.bulk_write(ops).ordered(false).await {
             Ok(result) => log::info!("Upserted {} updates.", result.modified_count),
-            Err(_) => {}
+            Err(err) => log::error!("Failed to upsert updates: {}", err),
         }
     }
 }
@@ -103,9 +117,12 @@ async fn find_all<T: DeserializeOwned + Unpin + Send + Sync>(
     user_id: ObjectId,
 ) -> Vec<T> {
     match collection.find(doc! { "user": user_id }).await {
-        Ok(result) => result.try_collect().await.unwrap(),
+        Ok(result) => result.try_collect().await.unwrap_or_else(|err| {
+            log::error!("Failed to collect results from {}: {}", collection.name(), err);
+            vec![]
+        }),
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Failed to query {}: {}", collection.name(), err);
             vec![]
         }
     }

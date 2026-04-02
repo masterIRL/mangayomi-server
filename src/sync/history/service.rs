@@ -13,14 +13,10 @@ pub async fn sync_history_list(
     db: web::Data<Client>,
 ) -> HistoryList {
     let col_histories = db.database("mangayomi").collection("histories");
-    let reset_all = history_list
-        .reset_all
-        .clone()
-        .get_or_insert(false)
-        .to_owned();
+    let reset_all = history_list.reset_all.unwrap_or(false);
 
     if reset_all {
-        delete_many(&col_histories, user_id, &vec![0], true).await;
+        delete_many(&col_histories, user_id, &[0], true).await;
     }
 
     upsert(
@@ -51,13 +47,13 @@ pub async fn sync_history_list(
 async fn delete_many<T: Send + Sync>(
     collection: &Collection<T>,
     user_id: ObjectId,
-    ids: &Vec<i32>,
+    ids: &[i64],
     reset_all: bool,
 ) {
     if ids.is_empty() {
         return;
     }
-    let del_tracks_result = collection
+    let del_result = collection
         .delete_many(if reset_all {
             doc! {
                 "user": user_id,
@@ -71,9 +67,9 @@ async fn delete_many<T: Send + Sync>(
             }
         })
         .await;
-    match del_tracks_result {
+    match del_result {
         Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
-        Err(_) => log::error!("Failed to delete {}.", collection.name()),
+        Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
     }
 }
 
@@ -85,7 +81,13 @@ async fn upsert(
 ) {
     let mut ops = vec![];
     for history in histories {
-        let mut doc = to_document(&history).unwrap();
+        let mut doc = match to_document(&history) {
+            Ok(doc) => doc,
+            Err(err) => {
+                log::error!("Failed to serialize history to BSON document: {}", err);
+                continue;
+            }
+        };
         doc.insert("user", user_id);
         ops.push(WriteModel::UpdateOne(
             UpdateOneModel::builder()
@@ -105,7 +107,7 @@ async fn upsert(
     if !ops.is_empty() {
         match db.bulk_write(ops).ordered(false).await {
             Ok(result) => log::info!("Upserted {} histories.", result.modified_count),
-            Err(_) => {}
+            Err(err) => log::error!("Failed to upsert histories: {}", err),
         }
     }
 }
@@ -115,9 +117,12 @@ async fn find_all<T: DeserializeOwned + Unpin + Send + Sync>(
     user_id: ObjectId,
 ) -> Vec<T> {
     match collection.find(doc! { "user": user_id }).await {
-        Ok(result) => result.try_collect().await.unwrap(),
+        Ok(result) => result.try_collect().await.unwrap_or_else(|err| {
+            log::error!("Failed to collect results from {}: {}", collection.name(), err);
+            vec![]
+        }),
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Failed to query {}: {}", collection.name(), err);
             vec![]
         }
     }

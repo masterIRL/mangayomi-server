@@ -3,7 +3,7 @@ FROM arm64v8/rust:bookworm AS build
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
-        musl-tools libssl-dev \
+        musl-tools \
         && rustup target add aarch64-unknown-linux-musl
 COPY . .
 RUN export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc && export CC=aarch64-linux-gnu-gcc

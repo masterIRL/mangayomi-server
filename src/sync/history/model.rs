@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct History {
-    #[serde(rename="_id", skip_serializing)]
+    #[serde(rename = "_id", skip_serializing)]
     pub oid: Option<ObjectId>,
-    pub id: i32,
+    pub id: i64,
     pub date: String,
     #[serde(rename = "mangaId")]
-    pub manga_id: i32,
+    pub manga_id: i64,
     #[serde(rename = "chapterId")]
-    pub chapter_id: i32,
+    pub chapter_id: i64,
     #[serde(rename = "itemType")]
     pub item_type: i32,
     #[serde(skip_serializing)]
@@ -22,7 +22,7 @@ pub struct History {
 #[derive(Serialize, Deserialize)]
 pub struct HistoryList {
     pub histories: Vec<History>,
-    pub deleted_histories: Vec<i32>,
+    pub deleted_histories: Vec<i64>,
     #[serde(rename = "resetAll")]
     pub reset_all: Option<bool>,
 }

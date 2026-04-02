@@ -11,9 +11,12 @@ async fn sync_settings_obj(
     user: Identity,
     settings: web::Json<SettingsObj>,
 ) -> impl Responder {
-    let user_id = ObjectId::parse_str(&user.id().unwrap()).unwrap();
+    let user_id = match user.id().ok().and_then(|id| ObjectId::parse_str(&id).ok()) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().finish(),
+    };
     match sync_settings(user_id, &settings, client).await {
         Some(data) => HttpResponse::Ok().json(data),
-        None => HttpResponse::InternalServerError().finish(),
+        None => HttpResponse::Ok().json(SettingsObj { settings: None }),
     }
 }

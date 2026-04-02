@@ -39,6 +39,25 @@ A self-hosted server for Mangayomi.
 6. Connect to the sync server using the host and port set in `.env`.  
    By default, the server will be reachable at `http://localhost:8080`
 
+## Testing Pipeline
+
+### 1. Automated Validation (Unit & Edge-cases)
+Run the native automated test suite to rigorously verify deserialization borders and payload mapping:
+```shell
+cargo test
+```
+
+### 2. Live Server Debugging
+If you want to run the server locally to debug endpoints natively inside your IDE:
+* Spin up only the ephemeral MongoDB database: `docker compose up database -d`
+* Then launch the server natively via your IDE (e.g., hitting the Run/Debug button in RustRover) or run `cargo run`. This allows you to set granular breakpoints in your Rust environment.
+
+### 3. Client HTTP Validation
+With your local server actively running, use the built-in HTTP client in RustRover (or VS Code's REST Client) to simulate the Dart Client directly securely:
+* Open `tests/api/sync_endpoints.http`
+* Click the run/play buttons (`▶`) next to the Register/Login requests to authenticate.
+* Fire the mock JSON tracking payload streams and view the instant `200 OK` server responses right in your IDE layout.
+
 ## How to use it on the client
 Go to Settings -> Sync:
 

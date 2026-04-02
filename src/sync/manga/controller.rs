@@ -11,7 +11,10 @@ async fn sync_manga(
     user: Identity,
     manga_list: web::Json<MangaList>,
 ) -> impl Responder {
-    let user_id = ObjectId::parse_str(&user.id().unwrap()).unwrap();
+    let user_id = match user.id().ok().and_then(|id| ObjectId::parse_str(&id).ok()) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().finish(),
+    };
     let result = sync_manga_list(user_id, &manga_list, client);
     HttpResponse::Ok().json(result.await)
 }

@@ -11,7 +11,10 @@ async fn sync_updates(
     user: Identity,
     update_list: web::Json<UpdateList>,
 ) -> impl Responder {
-    let user_id = ObjectId::parse_str(&user.id().unwrap()).unwrap();
+    let user_id = match user.id().ok().and_then(|id| ObjectId::parse_str(&id).ok()) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().finish(),
+    };
     let result = sync_update_list(user_id, &update_list, client);
     HttpResponse::Ok().json(result.await)
 }

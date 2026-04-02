@@ -55,7 +55,11 @@ async fn logout(user: Identity) -> Result<String> {
 /// update account
 #[post("/profile")]
 async fn profile(client: Data<Client>, user: Identity, data: web::Json<UpdateUser>) -> impl Responder {
-    let success = update_account(client, ObjectId::parse_str(&user.id().unwrap()).unwrap(), &data).await;
+    let user_id = match user.id().ok().and_then(|id| ObjectId::parse_str(&id).ok()) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().body("Unauthorized"),
+    };
+    let success = update_account(client, user_id, &data).await;
     if success {
         return HttpResponse::Ok().body("Account updated!".to_string());
     }
@@ -65,7 +69,11 @@ async fn profile(client: Data<Client>, user: Identity, data: web::Json<UpdateUse
 /// delete account
 #[delete("/delete")]
 async fn delete(client: Data<Client>, user: Identity) -> impl Responder {
-    let success = delete_account(client, ObjectId::parse_str(&user.id().unwrap()).unwrap()).await;
+    let user_id = match user.id().ok().and_then(|id| ObjectId::parse_str(&id).ok()) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().body("Unauthorized"),
+    };
+    let success = delete_account(client, user_id).await;
     if success {
         return HttpResponse::Ok().body("Account successfully deleted!".to_string());
     }

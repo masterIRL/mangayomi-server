@@ -1,0 +1,85 @@
+### Sync API Hardening Verification
+# This file contains real HTTP payloads simulation to verify first-sync panic
+# and deserialization bug fixes for Mangayomi.
+
+### 1. Register a test user
+POST http://localhost:8080/user/register
+Content-Type: application/json
+
+{
+    "email": "sync_test@mangayomi.com",
+    "password": "supersecurepassword123!"
+}
+
+### 2. Login to get session
+POST http://localhost:8080/user/login
+Content-Type: application/json
+
+{
+    "email": "sync_test@mangayomi.com",
+    "password": "supersecurepassword123!"
+}
+
+### 3. First Sync (Download-Only) — THIS USED TO PANIC
+# Dart client sends {} when it has no data. The server used to panic
+# because `find_one` returned None. With our fixes, it returns `{"settings": null}` safely.
+POST http://localhost:8080/sync/settings
+Content-Type: application/json
+
+{}
+
+### 4. First Sync Manga (Empty library) — USED TO CRASH
+POST http://localhost:8080/sync/manga
+Content-Type: application/json
+
+{
+    "categories": [],
+    "deleted_categories": [],
+    "manga": [],
+    "deleted_manga": [],
+    "chapters": [],
+    "deleted_chapters": [],
+    "tracks": [],
+    "deleted_tracks": []
+}
+
+### 5. Sync with Heavy Data (Dart Int Overflow Simulation)
+# Both ID and timestamps are values strictly larger than i32::MAX.
+# Before our fix, this threw a 400 Bad Request error due to Serde failure.
+POST http://localhost:8080/sync/manga
+Content-Type: application/json
+
+{
+    "categories": [],
+    "deleted_categories": [],
+    "manga": [
+        {
+            "id": 4000000000,
+            "name": "I32 Overflow Test",
+            "link": "https://example.com",
+            "imageUrl": "https://example.com",
+            "description": null,
+            "author": null,
+            "artist": null,
+            "status": 1,
+            "favorite": true,
+            "source": "Local",
+            "sourceId": null,
+            "lang": "en",
+            "dateAdded": 1775156240310,
+            "lastUpdate": 1775156240310,
+            "lastRead": null,
+            "isLocalArchive": false,
+            "customCoverFromTracker": null,
+            "itemType": 0,
+            "genre": null,
+            "categories": null,
+            "updatedAt": 1775156240310
+        }
+    ],
+    "deleted_manga": [],
+    "chapters": [],
+    "deleted_chapters": [],
+    "tracks": [],
+    "deleted_tracks": []
+}
