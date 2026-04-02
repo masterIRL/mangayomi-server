@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 
 pub async fn sync_settings(
     user_id: ObjectId,
-    settings: &web::Json<SettingsObj>,
+    settings: &SettingsObj,
     db: web::Data<Client>,
 ) -> Option<SettingsObj> {
     let col_settings = db.database("mangayomi").collection("settings");

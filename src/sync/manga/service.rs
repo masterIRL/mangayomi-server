@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 
 pub async fn sync_manga_list(
     user_id: ObjectId,
-    manga_list: &web::Json<MangaList>,
+    manga_list: &MangaList,
     db: web::Data<Client>,
 ) -> MangaList {
     let col_categories = db.database("mangayomi").collection("categories");

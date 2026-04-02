@@ -164,8 +164,8 @@ pub async fn delete_account(db: web::Data<Client>, user_id: ObjectId) -> bool {
         delete_many(&col_updates, user_id, empty_ids, false).await;
         delete_many(&col_settings, user_id, empty_ids, false).await;
         
-        let user_empty: &[i32] = &[0];
-        // For User table we still pass &[i32] to delete_many_user
+        let user_empty: &[i64] = &[0];
+        // For User table we still pass &[i64] to delete_many_user
         delete_many_user(&col_users, user_id, user_empty, true).await;
         return true;
     }
@@ -197,7 +197,7 @@ async fn delete_many<T: Send + Sync>(
 async fn delete_many_user<T: Send + Sync>(
     collection: &Collection<T>,
     user_id: ObjectId,
-    ids: &[i32],
+    ids: &[i64],
     is_user: bool,
 ) {
     if ids.is_empty() {

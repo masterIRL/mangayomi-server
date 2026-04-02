@@ -47,9 +47,14 @@ async fn login(
 
 /// logout from session
 #[get("/logout")]
-async fn logout(user: Identity) -> Result<String> {
-    user.logout();
-    Ok("Logged out!".to_owned())
+async fn logout(user: Option<Identity>) -> Result<HttpResponse> {
+    if let Some(u) = user {
+        u.logout();
+        Ok(HttpResponse::Ok().body("Logged out!"))
+    } else {
+        // Already logged out or session expired
+        Ok(HttpResponse::Ok().body("Already logged out!"))
+    }
 }
 
 /// update account

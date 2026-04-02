@@ -12,7 +12,7 @@ pub struct History {
     #[serde(rename = "chapterId")]
     pub chapter_id: i64,
     #[serde(rename = "itemType")]
-    pub item_type: i32,
+    pub item_type: i64,
     #[serde(skip_serializing)]
     pub user: Option<ObjectId>,
     #[serde(rename = "updatedAt")]

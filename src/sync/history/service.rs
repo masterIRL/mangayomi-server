@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 
 pub async fn sync_history_list(
     user_id: ObjectId,
-    history_list: &web::Json<HistoryList>,
+    history_list: &HistoryList,
     db: web::Data<Client>,
 ) -> HistoryList {
     let col_histories = db.database("mangayomi").collection("histories");

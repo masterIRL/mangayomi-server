@@ -12,19 +12,19 @@ pub struct Settings {
     pub updated_at: i64,
 
     #[serde(rename = "displayType")]
-    pub display_type: i32,
+    pub display_type: i64,
 
     #[serde(rename = "libraryFilterMangasDownloadType")]
-    pub library_filter_mangas_download_type: Option<i32>,
+    pub library_filter_mangas_download_type: Option<i64>,
 
     #[serde(rename = "libraryFilterMangasUnreadType")]
-    pub library_filter_mangas_unread_type: Option<i32>,
+    pub library_filter_mangas_unread_type: Option<i64>,
 
     #[serde(rename = "libraryFilterMangasStartedType")]
-    pub library_filter_mangas_started_type: Option<i32>,
+    pub library_filter_mangas_started_type: Option<i64>,
 
     #[serde(rename = "libraryFilterMangasBookMarkedType")]
-    pub library_filter_mangas_book_marked_type: Option<i32>,
+    pub library_filter_mangas_book_marked_type: Option<i64>,
 
     #[serde(rename = "libraryShowCategoryTabs")]
     pub library_show_category_tabs: Option<bool>,
@@ -66,10 +66,10 @@ pub struct Settings {
     pub date_format: Option<String>,
 
     #[serde(rename = "relativeTimesTamps")]
-    pub relative_times_tamps: Option<i32>,
+    pub relative_times_tamps: Option<i64>,
 
     #[serde(rename = "flexSchemeColorIndex")]
-    pub flex_scheme_color_index: Option<i32>,
+    pub flex_scheme_color_index: Option<i64>,
 
     #[serde(rename = "themeIsDark")]
     pub theme_is_dark: Option<bool>,
@@ -93,7 +93,7 @@ pub struct Settings {
     pub user_agent: Option<String>,
 
     #[serde(rename = "defaultReaderMode")]
-    pub default_reader_mode: i32,
+    pub default_reader_mode: i64,
 
     #[serde(rename = "personalReaderModeList")]
     pub personal_reader_mode_list: Option<Vec<PersonalReaderMode>>,
@@ -102,7 +102,7 @@ pub struct Settings {
     pub animate_page_transitions: Option<bool>,
 
     #[serde(rename = "doubleTapAnimationSpeed")]
-    pub double_tap_animation_speed: Option<i32>,
+    pub double_tap_animation_speed: Option<i64>,
 
     #[serde(rename = "onlyIncludePinnedSources")]
     pub only_include_pinned_sources: Option<bool>,
@@ -117,7 +117,7 @@ pub struct Settings {
     pub save_as_cbz_archive: Option<bool>,
 
     #[serde(rename = "concurrentDownloads")]
-    pub concurrent_downloads: Option<i32>,
+    pub concurrent_downloads: Option<i64>,
 
     #[serde(rename = "downloadLocation")]
     pub download_location: Option<String>,
@@ -138,19 +138,19 @@ pub struct Settings {
     pub default_subtitle_lang: Option<L10nLocale>,
 
     #[serde(rename = "animeDisplayType")]
-    pub anime_display_type: i32,
+    pub anime_display_type: i64,
 
     #[serde(rename = "libraryFilterAnimeDownloadType")]
-    pub library_filter_anime_download_type: Option<i32>,
+    pub library_filter_anime_download_type: Option<i64>,
 
     #[serde(rename = "libraryFilterAnimeUnreadType")]
-    pub library_filter_anime_unread_type: Option<i32>,
+    pub library_filter_anime_unread_type: Option<i64>,
 
     #[serde(rename = "libraryFilterAnimeStartedType")]
-    pub library_filter_anime_started_type: Option<i32>,
+    pub library_filter_anime_started_type: Option<i64>,
 
     #[serde(rename = "libraryFilterAnimeBookMarkedType")]
-    pub library_filter_anime_book_marked_type: Option<i32>,
+    pub library_filter_anime_book_marked_type: Option<i64>,
 
     #[serde(rename = "animeLibraryShowCategoryTabs")]
     pub anime_library_show_category_tabs: Option<bool>,
@@ -174,7 +174,7 @@ pub struct Settings {
     pub sort_library_anime: Option<SortLibraryManga>,
 
     #[serde(rename = "pagePreloadAmount")]
-    pub page_preload_amount: Option<i32>,
+    pub page_preload_amount: Option<i64>,
 
     #[serde(rename = "enableLogs")]
     pub enable_logs: Option<bool>,
@@ -186,22 +186,22 @@ pub struct Settings {
     pub check_for_extension_updates: Option<bool>,
 
     #[serde(rename = "scaleType")]
-    pub scale_type: i32,
+    pub scale_type: i64,
 
     #[serde(rename = "backgroundColor")]
-    pub background_color: i32,
+    pub background_color: i64,
 
     #[serde(rename = "personalPageModeList")]
     pub personal_page_mode_list: Option<Vec<PersonalPageMode>>,
 
     #[serde(rename = "startDatebackup")]
-    pub start_datebackup: Option<i32>,
+    pub start_datebackup: Option<i64>,
 
     #[serde(rename = "backupFrequency")]
-    pub backup_frequency: Option<i32>,
+    pub backup_frequency: Option<i64>,
 
     #[serde(rename = "backupListOptions")]
-    pub backup_list_options: Option<Vec<i32>>,
+    pub backup_list_options: Option<Vec<i64>>,
 
     #[serde(rename = "autoBackupLocation")]
     pub auto_backup_location: Option<String>,
@@ -213,13 +213,13 @@ pub struct Settings {
     pub auto_scroll_pages: Option<Vec<AutoScrollPages>>,
 
     #[serde(rename = "markEpisodeAsSeenType")]
-    pub mark_episode_as_seen_type: Option<i32>,
+    pub mark_episode_as_seen_type: Option<i64>,
 
     #[serde(rename = "defaultSkipIntroLength")]
-    pub default_skip_intro_length: Option<i32>,
+    pub default_skip_intro_length: Option<i64>,
 
     #[serde(rename = "defaultDoubleTapToSkipLength")]
-    pub default_double_tap_to_skip_length: Option<i32>,
+    pub default_double_tap_to_skip_length: Option<i64>,
 
     #[serde(rename = "defaultPlayBackSpeed")]
     pub default_play_back_speed: Option<f64>,
@@ -240,7 +240,7 @@ pub struct Settings {
     pub enable_auto_skip: Option<bool>,
 
     #[serde(rename = "aniSkipTimeoutLength")]
-    pub ani_skip_timeout_length: Option<i32>,
+    pub ani_skip_timeout_length: Option<i64>,
 
     #[serde(rename = "customDns")]
     pub custom_dns: Option<String>,
@@ -255,7 +255,7 @@ pub struct Settings {
     pub bt_server_address: Option<String>,
 
     #[serde(rename = "btServerPort")]
-    pub bt_server_port: Option<i32>,
+    pub bt_server_port: Option<i64>,
 
     #[serde(rename = "fullScreenReader")]
     pub full_screen_reader: Option<bool>,
@@ -266,26 +266,23 @@ pub struct Settings {
     #[serde(rename = "enableCustomColorFilter")]
     pub enable_custom_color_filter: Option<bool>,
 
-    #[serde(rename = "colorFilterBlendMode")]
-    pub color_filter_blend_mode: i32,
-
-    #[serde(rename = "playerSubtitleSettings")]
-    pub player_subtitle_settings: Option<PlayerSubtitleSettings>,
+#[serde(rename = "colorFilterBlendMode")]
+    pub color_filter_blend_mode: i64,
 
     #[serde(rename = "mangaHomeDisplayType")]
-    pub manga_home_display_type: i32,
+    pub manga_home_display_type: i64,
 
     #[serde(rename = "appFontFamily")]
     pub app_font_family: Option<String>,
 
     #[serde(rename = "mangaGridSize")]
-    pub manga_grid_size: Option<i32>,
+    pub manga_grid_size: Option<i64>,
 
     #[serde(rename = "animeGridSize")]
-    pub anime_grid_size: Option<i32>,
+    pub anime_grid_size: Option<i64>,
 
     #[serde(rename = "novelGridSize")]
-    pub novel_grid_size: Option<i32>,
+    pub novel_grid_size: Option<i64>,
 
     #[serde(rename = "mangaExtensionsRepo")]
     pub manga_extensions_repo: Option<Vec<Repo>>,
@@ -300,7 +297,7 @@ pub struct Settings {
     pub android_proxy_server: Option<String>,
 
     #[serde(rename = "disableSectionType")]
-    pub disable_section_type: i32,
+    pub disable_section_type: i64,
 
     #[serde(rename = "useLibass")]
     pub use_libass: Option<bool>,
@@ -312,16 +309,16 @@ pub struct Settings {
     pub enable_hardware_acceleration: Option<bool>,
 
     #[serde(rename = "libraryFilterNovelDownloadType")]
-    pub library_filter_novel_download_type: Option<i32>,
+    pub library_filter_novel_download_type: Option<i64>,
 
     #[serde(rename = "libraryFilterNovelUnreadType")]
-    pub library_filter_novel_unread_type: Option<i32>,
+    pub library_filter_novel_unread_type: Option<i64>,
 
     #[serde(rename = "libraryFilterNovelStartedType")]
-    pub library_filter_novel_started_type: Option<i32>,
+    pub library_filter_novel_started_type: Option<i64>,
 
     #[serde(rename = "libraryFilterNovelBookMarkedType")]
-    pub library_filter_novel_book_marked_type: Option<i32>,
+    pub library_filter_novel_book_marked_type: Option<i64>,
 
     #[serde(rename = "novelLibraryShowCategoryTabs")]
     pub novel_library_show_category_tabs: Option<bool>,
@@ -345,13 +342,13 @@ pub struct Settings {
     pub sort_library_novel: Option<SortLibraryManga>,
 
     #[serde(rename = "novelDisplayType")]
-    pub novel_display_type: i32,
+    pub novel_display_type: i64,
 
     #[serde(rename = "novelFontSize")]
-    pub novel_font_size: Option<i32>,
+    pub novel_font_size: Option<i64>,
 
     #[serde(rename = "novelTextAlign")]
-    pub novel_text_align: i32,
+    pub novel_text_align: i64,
 
     #[serde(rename = "novelReaderTheme")]
     pub novel_reader_theme: Option<String>,
@@ -360,7 +357,7 @@ pub struct Settings {
     pub novel_reader_text_color: Option<String>,
 
     #[serde(rename = "novelReaderPadding")]
-    pub novel_reader_padding: Option<i32>,
+    pub novel_reader_padding: Option<i64>,
 
     #[serde(rename = "novelReaderLineHeight")]
     pub novel_reader_line_height: Option<f64>,
@@ -408,7 +405,7 @@ pub struct Settings {
     pub use_mpv_config: Option<bool>,
 
     #[serde(rename = "debandingType")]
-    pub debanding_type: Option<i32>,
+    pub debanding_type: Option<i64>,
 
     #[serde(rename = "enableGpuNext")]
     pub enable_gpu_next: Option<bool>,
@@ -423,10 +420,10 @@ pub struct Settings {
     pub enable_audio_pitch_correction: Option<bool>,
 
     #[serde(rename = "audioChannels")]
-    pub audio_channels: Option<i32>,
+    pub audio_channels: Option<i64>,
 
     #[serde(rename = "volumeBoostCap")]
-    pub volume_boost_cap: Option<i32>,
+    pub volume_boost_cap: Option<i64>,
 
     #[serde(rename = "algorithmWeights")]
     pub algorithm_weights: Option<AlgorithmWeights>,
@@ -441,45 +438,45 @@ pub struct Settings {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SortLibraryManga {
     pub reverse: Option<bool>,
-    pub index: Option<i32>,
+    pub index: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SortChapter {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     pub reverse: Option<bool>,
-    pub index: Option<i32>,
+    pub index: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChapterFilterDownloaded {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     #[serde(rename = "type")]
-    pub filter_type: Option<i32>,
+    pub filter_type: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChapterFilterUnread {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     #[serde(rename = "type")]
-    pub filter_type: Option<i32>,
+    pub filter_type: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChapterFilterBookmarked {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     #[serde(rename = "type")]
-    pub filter_type: Option<i32>,
+    pub filter_type: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChapterPageUrls {
     #[serde(rename = "chapterId")]
-    pub chapter_id: Option<i32>,
+    pub chapter_id: Option<i64>,
     #[serde(rename = "chapterUrl")]
     pub chapter_url: Option<String>,
     pub urls: Option<Vec<String>>,
@@ -489,30 +486,30 @@ pub struct ChapterPageUrls {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChapterPageIndex {
     #[serde(rename = "chapterId")]
-    pub chapter_id: Option<i32>,
-    pub index: Option<i32>,
+    pub chapter_id: Option<i64>,
+    pub index: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersonalReaderMode {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     #[serde(rename = "readerMode")]
-    pub reader_mode: i32,
+    pub reader_mode: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersonalPageMode {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     #[serde(rename = "pageMode")]
-    pub page_mode: i32,
+    pub page_mode: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AutoScrollPages {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     #[serde(rename = "pageOffset")]
     pub page_offset: f64,
     #[serde(rename = "autoScroll")]
@@ -531,7 +528,7 @@ pub struct Repo {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FilterScanlator {
     #[serde(rename = "mangaId")]
-    pub manga_id: Option<i32>,
+    pub manga_id: Option<i64>,
     pub scanlators: Option<Vec<String>>,
 }
 
@@ -545,52 +542,52 @@ pub struct L10nLocale {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CustomColorFilter {
-    pub a: Option<i32>,
-    pub r: Option<i32>,
-    pub g: Option<i32>,
-    pub b: Option<i32>,
+    pub a: Option<i64>,
+    pub r: Option<i64>,
+    pub g: Option<i64>,
+    pub b: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayerSubtitleSettings {
     #[serde(rename = "fontSize")]
-    pub font_size: Option<i32>,
+    pub font_size: Option<i64>,
     #[serde(rename = "useBold")]
     pub use_bold: Option<bool>,
     #[serde(rename = "useItalic")]
     pub use_italic: Option<bool>,
     #[serde(rename = "textColorA")]
-    pub text_color_a: Option<i32>,
+    pub text_color_a: Option<i64>,
     #[serde(rename = "textColorR")]
-    pub text_color_r: Option<i32>,
+    pub text_color_r: Option<i64>,
     #[serde(rename = "textColorG")]
-    pub text_color_g: Option<i32>,
+    pub text_color_g: Option<i64>,
     #[serde(rename = "textColorB")]
-    pub text_color_b: Option<i32>,
+    pub text_color_b: Option<i64>,
     #[serde(rename = "borderColorA")]
-    pub border_color_a: Option<i32>,
+    pub border_color_a: Option<i64>,
     #[serde(rename = "borderColorR")]
-    pub border_color_r: Option<i32>,
+    pub border_color_r: Option<i64>,
     #[serde(rename = "borderColorG")]
-    pub border_color_g: Option<i32>,
+    pub border_color_g: Option<i64>,
     #[serde(rename = "borderColorB")]
-    pub border_color_b: Option<i32>,
+    pub border_color_b: Option<i64>,
     #[serde(rename = "backgroundColorA")]
-    pub background_color_a: Option<i32>,
+    pub background_color_a: Option<i64>,
     #[serde(rename = "backgroundColorR")]
-    pub background_color_r: Option<i32>,
+    pub background_color_r: Option<i64>,
     #[serde(rename = "backgroundColorG")]
-    pub background_color_g: Option<i32>,
+    pub background_color_g: Option<i64>,
     #[serde(rename = "backgroundColorB")]
-    pub background_color_b: Option<i32>,
+    pub background_color_b: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AlgorithmWeights {
-    pub genre: Option<i32>,
-    pub setting: Option<i32>,
-    pub synopsis: Option<i32>,
-    pub theme: Option<i32>,
+    pub genre: Option<i64>,
+    pub setting: Option<i64>,
+    pub synopsis: Option<i64>,
+    pub theme: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize)]

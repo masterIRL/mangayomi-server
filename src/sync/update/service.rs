@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 
 pub async fn sync_update_list(
     user_id: ObjectId,
-    update_list: &web::Json<UpdateList>,
+    update_list: &UpdateList,
     db: web::Data<Client>,
 ) -> UpdateList {
     let col_updates = db.database("mangayomi").collection("updates");

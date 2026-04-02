@@ -1,6 +1,6 @@
-use crate::sync::history::model::History;
-use crate::sync::manga::model::{Category, Chapter, Manga, Track};
-use crate::sync::update::model::Update;
+use mangayomi_server::sync::history::model::History;
+use mangayomi_server::sync::manga::model::{Category, Chapter, Manga, Track};
+use mangayomi_server::sync::update::model::Update;
 use actix_governor::governor::middleware::NoOpMiddleware;
 use actix_governor::{Governor, GovernorConfig, GovernorConfigBuilder, PeerIpKeyExtractor};
 use actix_identity::IdentityMiddleware;
@@ -19,11 +19,7 @@ use std::fs;
 use tera::Tera;
 use walkdir::WalkDir;
 
-mod db;
-mod globals;
-mod sync;
-mod user;
-mod app;
+use mangayomi_server::{app, db, globals, sync, user};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

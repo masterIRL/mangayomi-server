@@ -13,8 +13,8 @@ pub struct Category {
     pub id: i64,
     pub name: String,
     #[serde(rename = "forItemType")]
-    pub for_item_type: i32,
-    pub pos: Option<i32>,
+    pub for_item_type: i64,
+    pub pos: Option<i64>,
     pub hide: Option<bool>,
     #[serde(rename = "shouldUpdate")]
     pub should_update: Option<bool>,
@@ -45,7 +45,7 @@ pub struct Manga {
     pub description: Option<String>,
     pub author: Option<String>,
     pub artist: Option<String>,
-    pub status: i32,
+    pub status: i64,
     pub favorite: bool,
     pub source: String,
     #[serde(rename = "sourceId")]
@@ -62,9 +62,9 @@ pub struct Manga {
     #[serde(rename = "customCoverFromTracker")]
     pub custom_cover_from_tracker: Option<String>,
     #[serde(rename = "itemType")]
-    pub item_type: i32,
+    pub item_type: i64,
     pub genre: Option<Vec<String>>,
-    pub categories: Option<Vec<i32>>,
+    pub categories: Option<Vec<i64>>,
     #[serde(skip_serializing)]
     pub user: Option<ObjectId>,
     #[serde(rename = "updatedAt")]
@@ -121,30 +121,30 @@ pub struct Track {
     pub oid: Option<ObjectId>,
     pub id: i64,
     #[serde(rename = "libraryId")]
-    pub library_id: Option<i32>,
+    pub library_id: Option<i64>,
     #[serde(rename = "mediaId")]
     pub media_id: Option<i64>,
     #[serde(rename = "mangaId")]
     pub manga_id: Option<i64>,
-    pub score: Option<i32>,
+    pub score: Option<i64>,
     #[serde(rename = "startedReadingDate")]
     pub started_reading_date: Option<i64>,
     #[serde(rename = "finishedReadingDate")]
     pub finished_reading_date: Option<i64>,
     #[serde(rename = "lastChapterRead")]
-    pub last_chapter_read: Option<i32>,
-    pub status: Option<i32>,
+    pub last_chapter_read: Option<i64>,
+    pub status: Option<i64>,
     #[serde(rename = "syncId")]
     pub sync_id: Option<i64>,
     pub title: Option<String>,
     #[serde(rename = "totalChapter")]
-    pub total_chapter: Option<i32>,
+    pub total_chapter: Option<i64>,
     #[serde(rename = "trackingUrl")]
     pub tracking_url: Option<String>,
     #[serde(rename = "isManga")]
     pub is_manga: Option<bool>,
     #[serde(rename = "itemType")]
-    pub item_type: i32,
+    pub item_type: i64,
     #[serde(skip_serializing)]
     pub user: Option<ObjectId>,
     #[serde(rename = "updatedAt")]
