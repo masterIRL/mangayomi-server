@@ -1,12 +1,10 @@
+use crate::config::collections;
+use crate::sync::extractor::ValidatePayload;
+use crate::sync::model::{Model, Syncable};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-pub trait Model {
-    fn get_id(&self) -> i64;
-    fn get_updated_at(&self) -> i64;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Category {
     #[serde(rename = "_id", skip_serializing)]
     pub oid: Option<ObjectId>,
@@ -33,7 +31,11 @@ impl Model for Category {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+impl Syncable for Category {
+    const COLLECTION_NAME: &'static str = collections::CATEGORIES;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Manga {
     #[serde(rename = "_id", skip_serializing)]
     pub oid: Option<ObjectId>,
@@ -80,7 +82,11 @@ impl Model for Manga {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+impl Syncable for Manga {
+    const COLLECTION_NAME: &'static str = collections::MANGA;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Chapter {
     #[serde(rename = "_id", skip_serializing)]
     pub oid: Option<ObjectId>,
@@ -115,7 +121,11 @@ impl Model for Chapter {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+impl Syncable for Chapter {
+    const COLLECTION_NAME: &'static str = collections::CHAPTERS;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Track {
     #[serde(rename = "_id", skip_serializing)]
     pub oid: Option<ObjectId>,
@@ -160,7 +170,48 @@ impl Model for Track {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+impl Syncable for Track {
+    const COLLECTION_NAME: &'static str = collections::TRACKS;
+}
+
+/// Manga sync payload containing heterogeneous entity types
+///
+/// # ARCHITECTURAL NOTE: Why MangaList does NOT implement `SyncList`
+///
+/// Unlike `HistoryList` or `UpdateList`, this struct contains **FOUR different
+/// entity types** (Category, Manga, Chapter, Track) that are stored in **FOUR
+/// separate MongoDB collections**.
+///
+/// The `SyncList` trait (defined in `crate::sync::service`) is designed for
+/// **homogeneous** entity lists only - it has a single associated type `Item`.
+/// This makes it fundamentally incompatible with `MangaList`.
+///
+/// ## Attempting to implement `SyncList` for `MangaList` would require:
+///
+/// 1. **A unified enum type** (enum MangaListItem { Category(Category), Manga(Manga), ... })
+///    This would add complexity, require runtime dispatch, and lose type safety.
+///
+/// 2. **Multiple associated types in the trait** (type Item1; type Item2; type Item3; type Item4;)
+///    This would over-engineer the trait for a single use case.
+///
+/// 3. **Dynamic dispatch with `Box<dyn Any>`**
+///    Loses zero-cost abstraction and compile-time type safety.
+///
+/// ## Current approach (INTENTIONAL AND CORRECT):
+///
+/// `MangaList` uses its own specialized service function (`sync_manga_list`)
+/// that uses `tokio::join!` for parallel fetching across all 4 collections.
+/// This is more performant than the generic `sync_entity_list` could ever be
+/// for this specific use case.
+///
+/// ## Summary:
+/// - `HistoryList` → 1 entity, 1 collection → implements `SyncList` ✅
+/// - `UpdateList` → 1 entity, 1 collection → implements `SyncList` ✅
+/// - `MangaList` → 4 entities, 4 collections → CANNOT implement `SyncList` ❌ (by design)
+///
+/// DO NOT attempt to "unify" this with the `SyncList` pattern. The current
+/// architecture is intentional, correct, and optimized for the domain.
+#[derive(Serialize, Deserialize, Default)]
 pub struct MangaList {
     pub categories: Vec<Category>,
     pub deleted_categories: Vec<i64>,
@@ -172,4 +223,34 @@ pub struct MangaList {
     pub deleted_tracks: Vec<i64>,
     #[serde(rename = "resetAll")]
     pub reset_all: Option<bool>,
+}
+
+impl ValidatePayload for MangaList {
+    fn item_count(&self) -> usize {
+        self.categories.len() + self.manga.len() + self.chapters.len() + self.tracks.len()
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        use crate::sync::validation;
+
+        // Validate deleted item counts AND IDs (for consistency with History/Update)
+        validation::validate_deleted_ids(&self.deleted_categories, "category")?;
+        validation::validate_deleted_ids(&self.deleted_manga, "manga")?;
+        validation::validate_deleted_ids(&self.deleted_chapters, "chapter")?;
+        validation::validate_deleted_ids(&self.deleted_tracks, "track")?;
+
+        // Validate item IDs
+        validation::validate_ids(&self.categories, "category", |c| c.id)?;
+        validation::validate_ids(&self.manga, "manga", |m| m.id)?;
+        validation::validate_ids(&self.chapters, "chapter", |c| c.id)?;
+        validation::validate_ids(&self.tracks, "track", |t| t.id)?;
+
+        Ok(())
+    }
+}
+
+impl crate::sync::handler::SyncResult for MangaList {
+    fn modified_count(&self) -> usize {
+        self.categories.len() + self.manga.len() + self.chapters.len() + self.tracks.len()
+    }
 }

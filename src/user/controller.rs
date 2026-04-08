@@ -78,11 +78,14 @@ async fn delete(client: Data<Client>, user: Identity) -> impl Responder {
         Some(id) => id,
         None => return HttpResponse::Unauthorized().body("Unauthorized"),
     };
-    let success = delete_account(client, user_id).await;
-    if success {
-        return HttpResponse::Ok().body("Account successfully deleted!".to_string());
+    match delete_account(client, user_id).await {
+        Ok(true) => HttpResponse::Ok().body("Account successfully deleted!"),
+        Ok(false) => HttpResponse::NotFound().body("Account not found"),
+        Err(e) => {
+            log::error!("Failed to delete account: {}", e);
+            HttpResponse::InternalServerError().body("Failed to delete account")
+        }
     }
-    HttpResponse::BadRequest().body("".to_string())
 }
 
 #[get("/")]

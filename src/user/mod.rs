@@ -1,3 +1,4 @@
 pub mod controller;
-pub mod service;
+pub mod extractor;
 pub mod model;
+pub mod service;

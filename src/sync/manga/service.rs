@@ -1,119 +1,66 @@
-use crate::sync::manga::model::{MangaList, Model};
-use crate::db::bulk_upsert::get_global_upserter;
+use crate::config::collections;
+use crate::db::utils::{find_all_by_user, get_database};
+use crate::sync::error::SyncError;
+use crate::sync::manga::model::{Category, Chapter, Manga, MangaList, Track};
+use crate::sync::service;
 use actix_web::web;
-use futures::TryStreamExt;
 use mongodb::bson::oid::ObjectId;
-use mongodb::bson::doc;
 use mongodb::{Client, Collection};
-use serde::de::DeserializeOwned;
 
 pub async fn sync_manga_list(
     user_id: ObjectId,
     manga_list: &MangaList,
     db: web::Data<Client>,
-) -> MangaList {
-    let database = db.database("mangayomi");
-    let col_categories: Collection<crate::sync::manga::model::Category> = database.collection("categories");
-    let col_manga: Collection<crate::sync::manga::model::Manga> = database.collection("manga");
-    let col_chapter: Collection<crate::sync::manga::model::Chapter> = database.collection("chapters");
-    let col_track: Collection<crate::sync::manga::model::Track> = database.collection("tracks");
+) -> Result<MangaList, SyncError> {
+    let database = get_database(&db);
+    let col_categories: Collection<Category> = database.collection(collections::CATEGORIES);
+    let col_manga: Collection<Manga> = database.collection(collections::MANGA);
+    let col_chapter: Collection<Chapter> = database.collection(collections::CHAPTERS);
+    let col_track: Collection<Track> = database.collection(collections::TRACKS);
     let reset_all = manga_list.reset_all.unwrap_or(false);
 
     if reset_all {
-        delete_many(&col_categories, user_id, &[0], true).await;
-        delete_many(&col_manga, user_id, &[0], true).await;
-        delete_many(&col_chapter, user_id, &[0], true).await;
-        delete_many(&col_track, user_id, &[0], true).await;
+        service::reset_all_entities(&col_categories, user_id, collections::CATEGORIES).await?;
+        service::reset_all_entities(&col_manga, user_id, collections::MANGA).await?;
+        service::reset_all_entities(&col_chapter, user_id, collections::CHAPTERS).await?;
+        service::reset_all_entities(&col_track, user_id, collections::TRACKS).await?;
     }
 
-    // Use bulk upserter (auto-detects MongoDB version)
-    if let Some(upserter) = get_global_upserter() {
-        upserter.upsert_batch(&col_categories, &manga_list.categories, user_id, |item: &crate::sync::manga::model::Category| {
-            (item.get_id(), item.get_updated_at())
-        }).await.ok();
-        
-        upserter.upsert_batch(&col_manga, &manga_list.manga, user_id, |item: &crate::sync::manga::model::Manga| {
-            (item.get_id(), item.get_updated_at())
-        }).await.ok();
-        
-        upserter.upsert_batch(&col_chapter, &manga_list.chapters, user_id, |item: &crate::sync::manga::model::Chapter| {
-            (item.get_id(), item.get_updated_at())
-        }).await.ok();
-        
-        upserter.upsert_batch(&col_track, &manga_list.tracks, user_id, |item: &crate::sync::manga::model::Track| {
-            (item.get_id(), item.get_updated_at())
-        }).await.ok();
-    } else {
-        log::error!("BulkUpserter not initialized!");
-    }
+    service::upsert_batch(&col_categories, user_id, &manga_list.categories, collections::CATEGORIES).await?;
+    service::upsert_batch(&col_manga, user_id, &manga_list.manga, collections::MANGA).await?;
+    service::upsert_batch(&col_chapter, user_id, &manga_list.chapters, collections::CHAPTERS).await?;
+    service::upsert_batch(&col_track, user_id, &manga_list.tracks, collections::TRACKS).await?;
 
     if !reset_all {
-        delete_many(
-            &col_categories,
-            user_id,
-            &manga_list.deleted_categories,
-            false,
-        )
-        .await;
-        delete_many(&col_manga, user_id, &manga_list.deleted_manga, false).await;
-        delete_many(&col_chapter, user_id, &manga_list.deleted_chapters, false).await;
-        delete_many(&col_track, user_id, &manga_list.deleted_tracks, false).await;
+        service::delete_by_ids(&col_categories, user_id, &manga_list.deleted_categories, collections::CATEGORIES).await?;
+        service::delete_by_ids(&col_manga, user_id, &manga_list.deleted_manga, collections::MANGA).await?;
+        service::delete_by_ids(&col_chapter, user_id, &manga_list.deleted_chapters, collections::CHAPTERS).await?;
+        service::delete_by_ids(&col_track, user_id, &manga_list.deleted_tracks, collections::TRACKS).await?;
     }
 
-    MangaList {
-        categories: find_all(&col_categories, user_id).await,
-        manga: find_all(&col_manga, user_id).await,
-        chapters: find_all(&col_chapter, user_id).await,
-        tracks: find_all(&col_track, user_id).await,
+    // Parallel fetch for better performance
+    let (categories_result, manga_result, chapters_result, tracks_result) = tokio::join!(
+        find_all_by_user(&col_categories, user_id),
+        find_all_by_user(&col_manga, user_id),
+        find_all_by_user(&col_chapter, user_id),
+        find_all_by_user(&col_track, user_id)
+    );
+
+    // Properly handle errors from find_all_by_user
+    let categories = categories_result.map_err(|e| SyncError::DatabaseError(e.to_string()))?;
+    let manga = manga_result.map_err(|e| SyncError::DatabaseError(e.to_string()))?;
+    let chapters = chapters_result.map_err(|e| SyncError::DatabaseError(e.to_string()))?;
+    let tracks = tracks_result.map_err(|e| SyncError::DatabaseError(e.to_string()))?;
+
+    Ok(MangaList {
+        categories,
+        manga,
+        chapters,
+        tracks,
         deleted_categories: vec![],
         deleted_manga: vec![],
         deleted_chapters: vec![],
         deleted_tracks: vec![],
         reset_all: manga_list.reset_all,
-    }
-}
-
-async fn delete_many<T: Send + Sync>(
-    collection: &Collection<T>,
-    user_id: ObjectId,
-    ids: &[i64],
-    reset_all: bool,
-) {
-    if ids.is_empty() {
-        return;
-    }
-    let del_result = collection
-        .delete_many(if reset_all {
-            doc! {
-                "user": user_id,
-            }
-        } else {
-            doc! {
-                "id": doc! {
-                    "$in": ids
-                },
-                "user": user_id,
-            }
-        })
-        .await;
-    match del_result {
-        Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
-        Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
-    }
-}
-
-async fn find_all<T: DeserializeOwned + Unpin + Send + Sync>(
-    collection: &Collection<T>,
-    user_id: ObjectId,
-) -> Vec<T> {
-    match collection.find(doc! { "user": user_id }).await {
-        Ok(result) => result.try_collect().await.unwrap_or_else(|err| {
-            log::error!("Failed to collect results from {}: {}", collection.name(), err);
-            vec![]
-        }),
-        Err(err) => {
-            log::error!("Failed to query {}: {}", collection.name(), err);
-            vec![]
-        }
-    }
+    })
 }

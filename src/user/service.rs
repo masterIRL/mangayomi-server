@@ -1,3 +1,4 @@
+use crate::config::{db as db_config, collections};
 use crate::sync::history::model::History;
 use crate::sync::manga::model::{Category, Chapter, Manga, Track};
 use crate::sync::settings::model::Settings;
@@ -8,7 +9,7 @@ use argon2::Argon2;
 use std::convert::TryFrom;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, to_document};
-use mongodb::{Client, Collection};
+use mongodb::{Client};
 use password_hash::rand_core::OsRng;
 use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -35,7 +36,7 @@ pub async fn register_account(db: web::Data<Client>, user: &web::Json<BasicUser>
                 return None;
             }
         };
-        let collection = db.database("mangayomi").collection("users");
+        let collection = db.database(db_config::DB_NAME).collection(collections::USERS);
         let timestamp = get_timestamp();
         let account = User {
             id: None,
@@ -126,7 +127,7 @@ pub async fn update_account(
                 return false;
             }
         };
-        let col_users: mongodb::Collection<User> = db.database("mangayomi").collection("users");
+        let col_users: mongodb::Collection<User> = db.database(db_config::DB_NAME).collection(collections::USERS);
         let result = col_users
             .update_one(
                 doc! { "_id": user_id },
@@ -139,86 +140,70 @@ pub async fn update_account(
 }
 
 // delete account and related collections
-pub async fn delete_account(db: web::Data<Client>, user_id: ObjectId) -> bool {
-    if find_account_by_id(user_id, &db).await.is_some() {
-        let col_users: mongodb::Collection<User> = db.database("mangayomi").collection("users");
-        let col_categories: mongodb::Collection<Category> =
-            db.database("mangayomi").collection("categories");
-        let col_manga: mongodb::Collection<Manga> = db.database("mangayomi").collection("manga");
-        let col_chapter: mongodb::Collection<Chapter> =
-            db.database("mangayomi").collection("chapters");
-        let col_track: mongodb::Collection<Track> = db.database("mangayomi").collection("tracks");
-        let col_histories: mongodb::Collection<History> =
-            db.database("mangayomi").collection("histories");
-        let col_updates: mongodb::Collection<Update> =
-            db.database("mangayomi").collection("updates");
-        let col_settings: mongodb::Collection<Settings> =
-            db.database("mangayomi").collection("settings");
-        
-        let empty_ids: &[i64] = &[0];
-        delete_many(&col_categories, user_id, empty_ids, false).await;
-        delete_many(&col_manga, user_id, empty_ids, false).await;
-        delete_many(&col_chapter, user_id, empty_ids, false).await;
-        delete_many(&col_track, user_id, empty_ids, false).await;
-        delete_many(&col_histories, user_id, empty_ids, false).await;
-        delete_many(&col_updates, user_id, empty_ids, false).await;
-        delete_many(&col_settings, user_id, empty_ids, false).await;
-        
-        let user_empty: &[i64] = &[0];
-        // For User table we still pass &[i64] to delete_many_user
-        delete_many_user(&col_users, user_id, user_empty, true).await;
-        return true;
+pub async fn delete_account(db: web::Data<Client>, user_id: ObjectId) -> Result<bool, String> {
+    if find_account_by_id(user_id, &db).await.is_none() {
+        return Ok(false);
     }
-    false
-}
-
-async fn delete_many<T: Send + Sync>(
-    collection: &Collection<T>,
-    user_id: ObjectId,
-    ids: &[i64],
-    is_user: bool,
-) {
-    if ids.is_empty() {
-        return;
+    
+    let database = db.database(db_config::DB_NAME);
+    let col_users: mongodb::Collection<User> = database.collection(collections::USERS);
+    let col_categories: mongodb::Collection<Category> = database.collection(collections::CATEGORIES);
+    let col_manga: mongodb::Collection<Manga> = database.collection(collections::MANGA);
+    let col_chapter: mongodb::Collection<Chapter> = database.collection(collections::CHAPTERS);
+    let col_track: mongodb::Collection<Track> = database.collection(collections::TRACKS);
+    let col_histories: mongodb::Collection<History> = database.collection(collections::HISTORIES);
+    let col_updates: mongodb::Collection<Update> = database.collection(collections::UPDATES);
+    let col_settings: mongodb::Collection<Settings> = database.collection(collections::SETTINGS);
+    
+    // Delete all user data from each collection
+    let filter = mongodb::bson::doc! { "user": user_id };
+    
+    // Execute deletions and track any failures
+    let mut errors = Vec::new();
+    
+    if let Err(e) = col_categories.delete_many(filter.clone()).await {
+        errors.push(format!("categories: {}", e));
     }
-    let del_result = collection
-        .delete_many(if is_user {
-            doc! { "_id": user_id }
-        } else {
-            doc! { "user": user_id }
-        })
-        .await;
-    match del_result {
-        Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
-        Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
+    if let Err(e) = col_manga.delete_many(filter.clone()).await {
+        errors.push(format!("manga: {}", e));
     }
-}
-
-async fn delete_many_user<T: Send + Sync>(
-    collection: &Collection<T>,
-    user_id: ObjectId,
-    ids: &[i64],
-    is_user: bool,
-) {
-    if ids.is_empty() {
-        return;
+    if let Err(e) = col_chapter.delete_many(filter.clone()).await {
+        errors.push(format!("chapters: {}", e));
     }
-    let del_result = collection
-        .delete_many(if is_user {
-            doc! { "_id": user_id }
-        } else {
-            doc! { "user": user_id }
-        })
-        .await;
-    match del_result {
-        Ok(result) => log::info!("Deleted {} {}.", result.deleted_count, collection.name()),
-        Err(err) => log::error!("Failed to delete {}: {}", collection.name(), err),
+    if let Err(e) = col_track.delete_many(filter.clone()).await {
+        errors.push(format!("tracks: {}", e));
+    }
+    if let Err(e) = col_histories.delete_many(filter.clone()).await {
+        errors.push(format!("histories: {}", e));
+    }
+    if let Err(e) = col_updates.delete_many(filter.clone()).await {
+        errors.push(format!("updates: {}", e));
+    }
+    if let Err(e) = col_settings.delete_many(filter.clone()).await {
+        errors.push(format!("settings: {}", e));
+    }
+    
+    // Delete the user record itself
+    match col_users.delete_one(mongodb::bson::doc! { "_id": user_id }).await {
+        Ok(result) => {
+            log::info!("Deleted {} user(s).", result.deleted_count);
+        }
+        Err(e) => {
+            log::error!("Failed to delete user: {}", e);
+            errors.push(format!("user: {}", e));
+        }
+    }
+    
+    if !errors.is_empty() {
+        Err(format!("Failed to delete some data: {:?}", errors))
+    } else {
+        Ok(true)
     }
 }
 
 /// returns an account with the matching id
 async fn find_account_by_id(id: ObjectId, db: &Client) -> Option<User> {
-    let collection = db.database("mangayomi").collection("users");
+    let collection = db.database(db_config::DB_NAME).collection::<User>(collections::USERS);
     match collection.find_one(doc! { "_id": id }).await {
         Ok(user) => user,
         Err(err) => {
@@ -230,7 +215,7 @@ async fn find_account_by_id(id: ObjectId, db: &Client) -> Option<User> {
 
 /// returns an account with the matching email
 async fn find_account(email: &String, db: &Client) -> Option<User> {
-    let collection = db.database("mangayomi").collection("users");
+    let collection = db.database(db_config::DB_NAME).collection::<User>(collections::USERS);
     match collection.find_one(doc! { "email": email }).await {
         Ok(user) => user,
         Err(err) => {

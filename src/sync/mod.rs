@@ -1,4 +1,10 @@
-pub mod manga;
+pub mod error;
+pub mod extractor;
+pub mod handler;
 pub mod history;
-pub mod update;
+pub mod manga;
+pub mod model;
+pub mod service;
 pub mod settings;
+pub mod update;
+pub mod validation;
